@@ -1,5 +1,6 @@
 /**
  * game.js - Bộ điều khiển trung tâm (Game Engine & State Management)
+ * Sử dụng requestAnimationFrame 60 FPS kết hợp Sub-grid Smooth Interpolation
  */
 class GameEngine {
     constructor(canvas, uiCallbacks) {
@@ -19,7 +20,8 @@ class GameEngine {
         this.level = 1;
         this.highScore = this.loadHighScore();
 
-        this.loopTimer = null;
+        this.animationFrameId = null;
+        this.lastTickTime = 0;
         this.currentSpeed = this.config.INITIAL_SPEED;
         this.normalFoodEatenCount = 0;
 
@@ -47,7 +49,7 @@ class GameEngine {
     setTheme(themeName) {
         if (this.config.THEMES[themeName]) {
             this.config.CURRENT_THEME = themeName;
-            this.render();
+            this.render(1);
         }
     }
 
@@ -63,7 +65,7 @@ class GameEngine {
         this.snake.reset();
         this.food.spawn(this.snake.segments, false);
 
-        this.render();
+        this.render(1);
         this.uiCallbacks.onScoreChange(this.score, this.highScore, this.level);
     }
 
@@ -82,6 +84,7 @@ class GameEngine {
         this.state = this.config.STATES.PAUSED;
         this.stopLoop();
         this.uiCallbacks.onStateChange(this.state);
+        this.render(1);
     }
 
     resume() {
@@ -107,30 +110,57 @@ class GameEngine {
         this.start();
     }
 
+    /**
+     * Khởi chạy vòng lặp đồ họa 60 FPS siêu mượt
+     */
     startLoop() {
         this.stopLoop();
-        this.loopTimer = setInterval(() => this.tick(), this.currentSpeed);
+        this.lastTickTime = performance.now();
+
+        const loop = (timestamp) => {
+            if (this.state === this.config.STATES.RUNNING) {
+                const now = timestamp || performance.now();
+                const delta = now - this.lastTickTime;
+
+                // Khi đủ khoảng thời gian nhịp tick (ví dụ: 100ms), kích hoạt di chuyển logic
+                if (delta >= this.currentSpeed) {
+                    this.tick();
+                    this.lastTickTime = now;
+                }
+
+                // Cập nhật các hạt ánh sáng ở 60 FPS
+                this.particleSystem.update();
+
+                // Kiểm tra mồi vàng hết hạn thời gian
+                if (this.food.isExpired()) {
+                    this.food.spawn(this.snake.segments, false);
+                }
+
+                // Tính toán tỷ lệ tiến độ nội suy từ 0.0 đến 1.0 giữa 2 nhịp tick
+                const progress = Math.min(1, (now - this.lastTickTime) / this.currentSpeed);
+                this.render(progress);
+
+                this.animationFrameId = requestAnimationFrame(loop);
+            }
+        };
+
+        this.animationFrameId = requestAnimationFrame(loop);
     }
 
     stopLoop() {
-        if (this.loopTimer) {
-            clearInterval(this.loopTimer);
-            this.loopTimer = null;
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
         }
     }
 
+    /**
+     * Nhịp cập nhật logic game (Grid logic)
+     */
     tick() {
         if (this.state !== this.config.STATES.RUNNING) return;
 
-        // Cập nhật các hạt ánh sáng
-        this.particleSystem.update();
-
-        // Kiểm tra mồi vàng hết hạn thời gian
-        if (this.food.isExpired()) {
-            this.food.spawn(this.snake.segments, false);
-        }
-
-        // Cập nhật vị trí rắn
+        // Cập nhật vị trí logic của rắn
         const newHead = this.snake.update();
 
         // 1. Kiểm tra va chạm biên hoặc thân
@@ -143,9 +173,6 @@ class GameEngine {
         if (newHead.x === this.food.x && newHead.y === this.food.y) {
             this.handleEatFood();
         }
-
-        // 3. Vẽ lại khung hình
-        this.render();
     }
 
     handleEatFood() {
@@ -156,20 +183,16 @@ class GameEngine {
         this.snake.grow();
 
         if (this.food.isGolden) {
-            // Ăn mồi vàng: +3 điểm, âm thanh đặc biệt, hạt nổ vàng rực rỡ
             this.score += this.config.GOLDEN_FOOD_SCORE;
             this.soundManager.playGoldenEatSound();
             this.particleSystem.burst(foodPixelX, foodPixelY, this.config.COLORS.goldenFood, 24);
-            // Quay lại sinh mồi thường
             this.food.spawn(this.snake.segments, false);
         } else {
-            // Ăn mồi thường: +1 điểm, âm bloop, hạt nổ
             this.score += 1;
             this.normalFoodEatenCount++;
             this.soundManager.playEatSound();
             this.particleSystem.burst(foodPixelX, foodPixelY, this.config.COLORS.food, 14);
 
-            // Kiểm tra kích hoạt mồi vàng
             if (this.normalFoodEatenCount % this.config.GOLDEN_FOOD_INTERVAL === 0) {
                 this.food.spawn(this.snake.segments, true);
             } else {
@@ -177,7 +200,7 @@ class GameEngine {
             }
         }
 
-        // Cập nhật cấp độ (Level)
+        // Cập nhật Cấp độ (Level)
         this.level = Math.floor(this.score / 5) + 1;
 
         if (this.score > this.highScore) {
@@ -186,13 +209,12 @@ class GameEngine {
 
         this.uiCallbacks.onScoreChange(this.score, this.highScore, this.level);
 
-        // Tăng tốc dần theo điểm
+        // Tăng tốc độ game theo cấp độ
         if (this.score % 2 === 0 && this.currentSpeed > this.config.MIN_SPEED) {
             this.currentSpeed = Math.max(
                 this.config.MIN_SPEED,
                 this.config.INITIAL_SPEED - (this.level - 1) * this.config.SPEED_STEP
             );
-            this.startLoop();
         }
     }
 
@@ -201,7 +223,6 @@ class GameEngine {
         this.stopLoop();
         this.soundManager.playGameOverSound();
 
-        // Tạo hiệu ứng nổ tại đầu rắn khi đâm
         const head = this.snake.segments[0];
         const size = this.config.GRID_SIZE;
         this.particleSystem.burst(head.x * size + size / 2, head.y * size + size / 2, '#ef4444', 28);
@@ -213,7 +234,7 @@ class GameEngine {
             highScore: this.highScore,
             level: this.level
         });
-        this.render();
+        this.render(1);
     }
 
     handleDirectionInput(direction) {
@@ -225,26 +246,18 @@ class GameEngine {
         }
     }
 
-    render() {
+    render(progress = 1) {
         const ctx = this.ctx;
         const width = this.canvas.width;
         const height = this.canvas.height;
         const colors = this.config.COLORS;
 
-        // Xóa màn hình với màu nền Theme
         ctx.fillStyle = colors.canvasBg;
         ctx.fillRect(0, 0, width, height);
 
-        // Vẽ lưới mờ
         this.drawGrid();
-
-        // Vẽ thức ăn
         this.food.draw(ctx);
-
-        // Vẽ con rắn
-        this.snake.draw(ctx);
-
-        // Vẽ các tia hạt ánh sáng
+        this.snake.draw(ctx, progress);
         this.particleSystem.draw(ctx);
     }
 

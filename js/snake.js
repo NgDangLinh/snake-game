@@ -1,5 +1,6 @@
 /**
  * snake.js - Quản lý chuyển động, thân gradient neon mượt mà, mắt sinh động
+ * Hỗ trợ nội suy chuyển động mượt mà 60 FPS (Sub-grid Smooth Interpolation)
  */
 class Snake {
     constructor(config) {
@@ -16,6 +17,9 @@ class Snake {
             { x: startX - 1, y: startY },
             { x: startX - 2, y: startY }
         ];
+
+        // Mảng lưu vị trí ở nhịp tick trước để nội suy chuyển động
+        this.prevSegments = this.segments.map(s => ({ x: s.x, y: s.y }));
 
         this.currentDirection = this.config.DIRECTIONS.RIGHT;
         this.directionQueue = [];
@@ -35,7 +39,13 @@ class Snake {
         }
     }
 
+    /**
+     * Cập nhật vị trí logic trên lưới
+     */
     update() {
+        // Lưu lại vị trí trước khi dịch chuyển
+        this.prevSegments = this.segments.map(s => ({ x: s.x, y: s.y }));
+
         if (this.directionQueue.length > 0) {
             this.currentDirection = this.directionQueue.shift();
         }
@@ -82,19 +92,29 @@ class Snake {
     }
 
     /**
-     * Vẽ con rắn với dải chuyển màu mượt mà từ đầu đến đuôi
+     * Vẽ con rắn với hiệu ứng trườn mượt mà 60 FPS và dải chuyển màu mượt
      * @param {CanvasRenderingContext2D} ctx 
+     * @param {number} progress Tiến độ giữa 2 nhịp tick (0.0 -> 1.0)
      */
-    draw(ctx) {
+    draw(ctx, progress = 1) {
         const size = this.config.GRID_SIZE;
         const total = this.segments.length;
         const colors = this.config.COLORS;
+        const t = Math.max(0, Math.min(1, progress));
 
-        // Vẽ từ đuôi lên đầu để đầu rắn nằm đè lên trên cùng
+        // Vẽ từ đuôi lên đầu để đầu rắn luôn nằm ở lớp trên cùng
         for (let index = total - 1; index >= 0; index--) {
-            const segment = this.segments[index];
-            const x = segment.x * size;
-            const y = segment.y * size;
+            const curr = this.segments[index];
+            const prev = (this.prevSegments && this.prevSegments[index]) 
+                ? this.prevSegments[index] 
+                : (this.prevSegments ? this.prevSegments[this.prevSegments.length - 1] : curr);
+
+            // Nội suy tọa độ giữa vị trí cũ và vị trí mới
+            const interpX = prev.x + (curr.x - prev.x) * t;
+            const interpY = prev.y + (curr.y - prev.y) * t;
+
+            const pixelX = interpX * size;
+            const pixelY = interpY * size;
 
             ctx.save();
 
@@ -105,23 +125,22 @@ class Snake {
                 ctx.fillStyle = colors.snakeHead;
 
                 ctx.beginPath();
-                ctx.roundRect(x + 1, y + 1, size - 2, size - 2, 7);
+                ctx.roundRect(pixelX + 1, pixelY + 1, size - 2, size - 2, 7);
                 ctx.fill();
 
-                // Vẽ 2 mắt lanh lợi
-                this.drawEyes(ctx, x, y, size, colors);
+                // Vẽ mắt theo vị trí đầu đang trườn
+                this.drawEyes(ctx, pixelX, pixelY, size, colors);
             } else {
-                // THÂN RẮN: Thon dần về phía đuôi (từ 0 đến 1)
+                // THÂN RẮN: Thuôn dần về đuôi
                 const ratio = index / total;
-                const shrink = ratio * 3.5; // Đuôi nhỏ hơn đầu một chút tạo hình thuôn thả
+                const shrink = ratio * 3.5;
                 const segSize = size - shrink;
                 const offset = shrink / 2;
 
-                // Màu chuyển nhẹ nhàng từ Start sang End
                 ctx.fillStyle = this.interpolateColor(colors.snakeBodyStart, colors.snakeBodyEnd, ratio);
 
                 ctx.beginPath();
-                ctx.roundRect(x + offset, y + offset, segSize, segSize, 5);
+                ctx.roundRect(pixelX + offset, pixelY + offset, segSize, segSize, 5);
                 ctx.fill();
             }
 
@@ -165,9 +184,6 @@ class Snake {
         ctx.fill();
     }
 
-    /**
-     * Hòa trộn màu sắc Hex RGB theo tỷ lệ
-     */
     interpolateColor(hex1, hex2, factor) {
         const c1 = this.hexToRgb(hex1);
         const c2 = this.hexToRgb(hex2);
