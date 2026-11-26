@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rắn Săn Mồi - Snake Game Deluxe</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <main class="game-container theme-cyberpunk">
+        <!-- Tiêu đề & Bảng điều khiển phụ -->
+        <header class="game-header">
+            <div class="header-top">
+                <h1 class="game-title">🐍 Snake Deluxe</h1>
+                <div class="header-actions">
+                    <!-- Chọn Theme -->
+                    <select id="themeSelect" class="theme-dropdown" aria-label="Chọn chủ đề">
+                        <option value="cyberpunk">🟢 Cyberpunk</option>
+                        <option value="synthwave">🟣 Synthwave</option>
+                    </select>
+                    <!-- Nút Bật/Tắt m thanh -->
+                    <button id="btnSound" class="icon-btn" title="Bật/Tắt âm thanh">🔊</button>
+                </div>
+            </div>
+
+            <!-- Bảng điểm HUD 3 ô: Điểm số, Cấp độ, Kỷ lục -->
+            <div class="scoreboard">
+                <div class="score-box">
+                    <span class="score-label">Điểm số</span>
+                    <span id="scoreVal" class="score-value">0</span>
+                </div>
+                <div class="score-box">
+                    <span class="score-label">Cấp độ</span>
+                    <span id="levelVal" class="score-value">1</span>
+                </div>
+                <div class="score-box">
+                    <span class="score-label">Kỷ lục</span>
+                    <span id="highScoreVal" class="score-value">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Khung Canvas & Màn hình hiển thị Overlay (Pause / Game Over) -->
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+            
+            <div id="gameOverlay" class="overlay hidden">
+                <div id="overlayTitle" class="overlay-title">TRÒ CHƠI KẾT THÚC</div>
+                <p id="overlayMessage" class="overlay-message">Điểm số của bạn: 0</p>
+                <button id="btnOverlayAction" class="btn btn-primary">🔄 Chơi lại</button>
+            </div>
+        </div>
+
+        <!-- Thanh điều khiển chính -->
+        <div class="controls-bar">
+            <button id="btnStart" class="btn btn-primary">▶ Bắt đầu</button>
+            <button id="btnPause" class="btn btn-secondary hidden">⏸ Tạm dừng</button>
+            <button id="btnRestart" class="btn btn-secondary">🔄 Chơi lại</button>
+        </div>
+
+        <!-- Hướng dẫn phím tắt -->
+        <footer class="instructions">
+            Điều khiển: <span class="key-badge">W A S D</span> hoặc <span class="key-badge">↑ ↓ ← →</span><br>
+            Tạm dừng: <span class="key-badge">Space</span> | Chơi lại: <span class="key-badge">R</span> | Âm thanh: <span class="key-badge">M</span>
+        </footer>
+    </main>
+
+    <!-- Nạp toàn bộ các module JavaScript -->
+    <script src="js/config.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/food.js"></script>
+    <script src="js/snake.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
