@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRestart = document.getElementById('btnRestart');
     const btnOverlayAction = document.getElementById('btnOverlayAction');
     const btnSound = document.getElementById('btnSound');
+    const btnMode = document.getElementById('btnMode');
     const themeSelect = document.getElementById('themeSelect');
     const gameContainer = document.querySelector('.game-container');
 
@@ -24,6 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnSound) {
             btnSound.innerHTML = isMuted ? '🔇' : '🔊';
             btnSound.title = isMuted ? 'Bật âm thanh' : 'Tắt âm thanh';
+        }
+    }
+
+    // Cập nhật trạng thái hiển thị của nút chế độ
+    function updateModeButton(isSmooth) {
+        if (btnMode) {
+            btnMode.innerHTML = isSmooth ? '🌊' : '⚡';
+            btnMode.title = isSmooth 
+                ? 'Chế độ: 🌊 Mượt mà 60fps (Bấm để đổi sang ⚡ Cổ điển)' 
+                : 'Chế độ: ⚡ Cổ điển siêu nhạy (Bấm để đổi sang 🌊 Mượt)';
         }
     }
 
@@ -79,14 +90,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Khởi tạo Game Engine
     const game = new GameEngine(canvas, uiCallbacks);
 
-    // Cài đặt ban đầu cho nút âm thanh
+    // Cài đặt ban đầu cho nút âm thanh và chế độ
     updateSoundButton(game.soundManager.isMuted);
+    updateModeButton(GameConfig.SMOOTH_MODE);
 
     // Xử lý bật/tắt âm thanh
     if (btnSound) {
         btnSound.addEventListener('click', () => {
             const isMuted = game.soundManager.toggleMute();
             updateSoundButton(isMuted);
+        });
+    }
+
+    // Xử lý chuyển đổi chế độ Mượt / Cổ điển
+    if (btnMode) {
+        btnMode.addEventListener('click', () => {
+            const isSmooth = game.toggleSmoothMode();
+            updateModeButton(isSmooth);
         });
     }
 
@@ -135,6 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'KeyM':
                 const isMuted = game.soundManager.toggleMute();
                 updateSoundButton(isMuted);
+                break;
+            case 'KeyV':
+                const isSmooth = game.toggleSmoothMode();
+                updateModeButton(isSmooth);
                 break;
         }
     });

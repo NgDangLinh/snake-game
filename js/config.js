@@ -14,10 +14,13 @@ const GameConfig = {
         return Math.floor(this.CANVAS_HEIGHT / this.GRID_SIZE);
     },
 
-    // Tốc độ game (ms/nhịp)
-    INITIAL_SPEED: 110,
-    MIN_SPEED: 55,
+    // Tốc độ game nhạy và chuẩn arcade (ms/nhịp)
+    INITIAL_SPEED: 85,
+    MIN_SPEED: 45,
     SPEED_STEP: 3,
+
+    // Chế độ hiển thị: true = Mượt 60 FPS (Smooth), false = Cổ điển (Classic Arcade)
+    SMOOTH_MODE: true,
 
     // Cấu hình mồi đặc biệt (Quả táo vàng)
     GOLDEN_FOOD_INTERVAL: 5,   // Cứ ăn 5 mồi thường sẽ có cơ hội xuất hiện 1 mồi vàng

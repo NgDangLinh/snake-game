@@ -1,6 +1,6 @@
 /**
  * snake.js - Quản lý chuyển động, thân gradient neon mượt mà, mắt sinh động
- * Hỗ trợ nội suy chuyển động mượt mà 60 FPS (Sub-grid Smooth Interpolation)
+ * Hỗ trợ phản hồi tức thì 0ms (Instant Pivot) và chuyển đổi mượt / cổ điển
  */
 class Snake {
     constructor(config) {
@@ -18,10 +18,11 @@ class Snake {
             { x: startX - 2, y: startY }
         ];
 
-        // Mảng lưu vị trí ở nhịp tick trước để nội suy chuyển động
         this.prevSegments = this.segments.map(s => ({ x: s.x, y: s.y }));
 
         this.currentDirection = this.config.DIRECTIONS.RIGHT;
+        // Hướng nhìn tức thì của mắt (xoay ngay lập tức khi bấm phím, 0ms lag)
+        this.facingDirection = this.currentDirection;
         this.directionQueue = [];
         this.shouldGrow = false;
     }
@@ -36,19 +37,18 @@ class Snake {
 
         if (!isOpposite && !isSame && this.directionQueue.length < 2) {
             this.directionQueue.push(newDir);
+            // Xoay hướng nhìn của mắt ngay lập tức để người chơi nhận phản hồi thị giác tức thì
+            this.facingDirection = newDir;
         }
     }
 
-    /**
-     * Cập nhật vị trí logic trên lưới
-     */
     update() {
-        // Lưu lại vị trí trước khi dịch chuyển
         this.prevSegments = this.segments.map(s => ({ x: s.x, y: s.y }));
 
         if (this.directionQueue.length > 0) {
             this.currentDirection = this.directionQueue.shift();
         }
+        this.facingDirection = this.currentDirection;
 
         const head = this.segments[0];
         const newHead = {
@@ -92,26 +92,26 @@ class Snake {
     }
 
     /**
-     * Vẽ con rắn với hiệu ứng trườn mượt mà 60 FPS và dải chuyển màu mượt
+     * Vẽ con rắn: Tự động phát hiện vẽ ở chế độ mượt (Smooth) hay cổ điển (Classic)
      * @param {CanvasRenderingContext2D} ctx 
-     * @param {number} progress Tiến độ giữa 2 nhịp tick (0.0 -> 1.0)
+     * @param {number} progress 
      */
     draw(ctx, progress = 1) {
         const size = this.config.GRID_SIZE;
         const total = this.segments.length;
         const colors = this.config.COLORS;
-        const t = Math.max(0, Math.min(1, progress));
+        const isSmooth = this.config.SMOOTH_MODE;
+        const t = isSmooth ? Math.max(0, Math.min(1, progress)) : 1;
 
-        // Vẽ từ đuôi lên đầu để đầu rắn luôn nằm ở lớp trên cùng
         for (let index = total - 1; index >= 0; index--) {
             const curr = this.segments[index];
-            const prev = (this.prevSegments && this.prevSegments[index]) 
+            const prev = (isSmooth && this.prevSegments && this.prevSegments[index]) 
                 ? this.prevSegments[index] 
                 : (this.prevSegments ? this.prevSegments[this.prevSegments.length - 1] : curr);
 
-            // Nội suy tọa độ giữa vị trí cũ và vị trí mới
-            const interpX = prev.x + (curr.x - prev.x) * t;
-            const interpY = prev.y + (curr.y - prev.y) * t;
+            // Nội suy tọa độ nếu ở chế độ Smooth, ngược lại vẽ đúng ô lưới (Classic)
+            const interpX = isSmooth ? (prev.x + (curr.x - prev.x) * t) : curr.x;
+            const interpY = isSmooth ? (prev.y + (curr.y - prev.y) * t) : curr.y;
 
             const pixelX = interpX * size;
             const pixelY = interpY * size;
@@ -119,7 +119,6 @@ class Snake {
             ctx.save();
 
             if (index === 0) {
-                // ĐẦU RẮN: Bo tròn nhiều hơn, phát sáng
                 ctx.shadowColor = colors.snakeHead;
                 ctx.shadowBlur = 8;
                 ctx.fillStyle = colors.snakeHead;
@@ -128,10 +127,9 @@ class Snake {
                 ctx.roundRect(pixelX + 1, pixelY + 1, size - 2, size - 2, 7);
                 ctx.fill();
 
-                // Vẽ mắt theo vị trí đầu đang trườn
+                // Vẽ mắt theo hướng nhìn tức thì (facingDirection)
                 this.drawEyes(ctx, pixelX, pixelY, size, colors);
             } else {
-                // THÂN RẮN: Thuôn dần về đuôi
                 const ratio = index / total;
                 const shrink = ratio * 3.5;
                 const segSize = size - shrink;
@@ -149,7 +147,7 @@ class Snake {
     }
 
     drawEyes(ctx, x, y, size, colors) {
-        const dir = this.currentDirection.name;
+        const dir = this.facingDirection ? this.facingDirection.name : this.currentDirection.name;
         const eyeRadius = 3;
         const pupilRadius = 1.5;
 
@@ -169,14 +167,12 @@ class Snake {
             eye2X = x + size * 0.72; eye2Y = y + size * 0.72;
         }
 
-        // Lòng trắng mắt
         ctx.fillStyle = colors.snakeEye;
         ctx.beginPath();
         ctx.arc(eye1X, eye1Y, eyeRadius, 0, Math.PI * 2);
         ctx.arc(eye2X, eye2Y, eyeRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Con ngươi mắt
         ctx.fillStyle = colors.snakePupil;
         ctx.beginPath();
         ctx.arc(eye1X, eye1Y, pupilRadius, 0, Math.PI * 2);

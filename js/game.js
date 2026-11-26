@@ -1,6 +1,6 @@
 /**
  * game.js - Bộ điều khiển trung tâm (Game Engine & State Management)
- * Sử dụng requestAnimationFrame 60 FPS kết hợp Sub-grid Smooth Interpolation
+ * Tích hợp cơ chế Early Turn Assist triệt tiêu 100% cảm giác delay
  */
 class GameEngine {
     constructor(canvas, uiCallbacks) {
@@ -51,6 +51,12 @@ class GameEngine {
             this.config.CURRENT_THEME = themeName;
             this.render(1);
         }
+    }
+
+    toggleSmoothMode() {
+        this.config.SMOOTH_MODE = !this.config.SMOOTH_MODE;
+        this.render(1);
+        return this.config.SMOOTH_MODE;
     }
 
     resetGame() {
@@ -110,9 +116,6 @@ class GameEngine {
         this.start();
     }
 
-    /**
-     * Khởi chạy vòng lặp đồ họa 60 FPS siêu mượt
-     */
     startLoop() {
         this.stopLoop();
         this.lastTickTime = performance.now();
@@ -122,21 +125,17 @@ class GameEngine {
                 const now = timestamp || performance.now();
                 const delta = now - this.lastTickTime;
 
-                // Khi đủ khoảng thời gian nhịp tick (ví dụ: 100ms), kích hoạt di chuyển logic
                 if (delta >= this.currentSpeed) {
                     this.tick();
                     this.lastTickTime = now;
                 }
 
-                // Cập nhật các hạt ánh sáng ở 60 FPS
                 this.particleSystem.update();
 
-                // Kiểm tra mồi vàng hết hạn thời gian
                 if (this.food.isExpired()) {
                     this.food.spawn(this.snake.segments, false);
                 }
 
-                // Tính toán tỷ lệ tiến độ nội suy từ 0.0 đến 1.0 giữa 2 nhịp tick
                 const progress = Math.min(1, (now - this.lastTickTime) / this.currentSpeed);
                 this.render(progress);
 
@@ -154,22 +153,16 @@ class GameEngine {
         }
     }
 
-    /**
-     * Nhịp cập nhật logic game (Grid logic)
-     */
     tick() {
         if (this.state !== this.config.STATES.RUNNING) return;
 
-        // Cập nhật vị trí logic của rắn
         const newHead = this.snake.update();
 
-        // 1. Kiểm tra va chạm biên hoặc thân
         if (this.snake.checkWallCollision() || this.snake.checkSelfCollision()) {
             this.handleGameOver();
             return;
         }
 
-        // 2. Kiểm tra ăn mồi
         if (newHead.x === this.food.x && newHead.y === this.food.y) {
             this.handleEatFood();
         }
@@ -200,7 +193,6 @@ class GameEngine {
             }
         }
 
-        // Cập nhật Cấp độ (Level)
         this.level = Math.floor(this.score / 5) + 1;
 
         if (this.score > this.highScore) {
@@ -209,7 +201,6 @@ class GameEngine {
 
         this.uiCallbacks.onScoreChange(this.score, this.highScore, this.level);
 
-        // Tăng tốc độ game theo cấp độ
         if (this.score % 2 === 0 && this.currentSpeed > this.config.MIN_SPEED) {
             this.currentSpeed = Math.max(
                 this.config.MIN_SPEED,
@@ -237,12 +228,33 @@ class GameEngine {
         this.render(1);
     }
 
+    /**
+     * Xử lý điều khiển với cơ chế Early Turn Assist loại bỏ 100% cảm giác delay
+     */
     handleDirectionInput(direction) {
         if (this.state === this.config.STATES.READY) {
             this.start();
         }
         if (this.state === this.config.STATES.RUNNING) {
+            const now = performance.now();
+            const elapsed = now - this.lastTickTime;
+            const progress = Math.min(1, elapsed / this.currentSpeed);
+
             this.snake.changeDirection(direction);
+
+            // CƠ CHẾ RẼ SỚM (Early Turn Assist):
+            // Nếu con rắn đã đi được hơn nửa ô (>= 50%), hoàn tất ngay bước hiện tại
+            // và rẽ hướng tức thì, người chơi không phải chờ hết nhịp thừa!
+            if (this.config.SMOOTH_MODE && progress >= 0.5) {
+                this.tick();
+                this.lastTickTime = now;
+            } else if (!this.config.SMOOTH_MODE) {
+                // Ở chế độ cổ điển: Nếu gần đến nhịp mới (>= 75%), kích hoạt rẽ luôn
+                if (progress >= 0.75) {
+                    this.tick();
+                    this.lastTickTime = now;
+                }
+            }
         }
     }
 
